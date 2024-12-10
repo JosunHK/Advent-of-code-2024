@@ -7,28 +7,42 @@ import Data.List (isInfixOf)
 
 main :: IO ()
 main = do
-  input <- openFile "input.txt" ReadMode
-  hSetEncoding input utf8
-  str <- readString input
-  let splitStr = splitOn "don't()" str
-  let filterStr = concat $ concatMap (tail . splitOn "do()") $ filter (isInfixOf "do()") $ tail splitStr
-  let parsedStr = filter (elem ',') $ map (takeWhile (/=')')) $ splitOn "mul(" (head splitStr ++ filterStr)
-  print $ sum $ map trySum parsedStr
-  hClose input
+  rulesH <- openFile "rules.txt" ReadMode
+  inputH <- openFile "input.txt" ReadMode
+  hSetEncoding rulesH utf8
+  hSetEncoding inputH utf8
+  rulesStr <- readString rulesH []
+  inputStr <- readString inputH []
+  let rules = parse rulesStr "|"
+  let input = parse inputStr ","
+  print $ solve rules input
+  hClose inputH
 
-trySum :: String -> Integer
-trySum s 
-       | length ints /= 2 = 0
-       | isNothing num1 || isNothing num2 = 0
-       | otherwise = fromJust num1 * fromJust num2
-    where ints = splitOn "," s
-          num1 = readMaybe $ head ints
-          num2 = readMaybe $ last ints
+solve :: [[Integer]] -> [[Integer]] -> Integer
+solve rules = sum . map (solve' rules) 
 
-readString:: Handle -> IO String
-readString fh = do
+solve' :: [[Integer]] -> [Integer] -> Integer
+solve' rules input = getMiddle $ snd $ foldl go (0, tail input) input 
+    where go :: (Integer, [Integer]) -> Integer -> (Integer, [Integer])
+          go acc@(valid, xs) x
+                | valid /= 0 = acc 
+                | wrongOrder = (valid+1, []) 
+                | otherwise  = (valid, tail xs)
+                where wrongOrder = any (`elem` xs) prevPage
+                      prevPage = map head $ filter ((==x) . last) rules
+
+getMiddle :: [Integer] -> Integer
+getMiddle pages = pages !! max 0 (length pages `div` 2)
+
+parse:: [String] -> String -> [[Integer]]
+parse x delim = map (map read . splitOn delim) x 
+
+readString:: Handle -> [String] -> IO [String]
+readString fh acc = do
   ineof <- hIsEOF fh
   if ineof
-    then return ""
-    else do hGetLine fh
+    then return acc
+    else do
+      inpStr <- hGetLine fh
+      readString fh (acc ++[inpStr])
 
